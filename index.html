@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة إدارة المباراة والإعلانات</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #fff; padding: 20px; direction: rtl; }
+    .admin-card { max-width: 600px; margin: auto; background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; }
+    h2 { font-size: 18px; margin-bottom: 15px; color: #38bdf8; text-align: center; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-size: 13px; margin-bottom: 6px; color: #94a3b8; font-weight: bold; }
+    input, textarea { width: 100%; padding: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #fff; font-size: 13px; }
+    textarea { height: 90px; resize: vertical; }
+    button { width: 100%; background: #0284c7; color: #fff; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; }
+    button:hover { background: #0369a1; }
+    .status-msg { text-align: center; margin-top: 10px; font-size: 12px; font-weight: bold; }
+    
+    .result-box {
+      margin-top: 20px;
+      padding: 12px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      display: none;
+    }
+    .result-box.active { display: block; }
+    .result-title { font-size: 12px; color: #38bdf8; margin-bottom: 6px; font-weight: bold; }
+    .link-row { display: flex; gap: 8px; }
+    .link-input { background: #1e293b; color: #34d399; font-weight: bold; font-size: 12px; }
+    .copy-btn { width: auto; background: #10b981; padding: 0 15px; font-size: 12px; }
+    .copy-btn:hover { background: #059669; }
+    .open-btn { width: auto; background: #0284c7; padding: 0 15px; font-size: 12px; text-decoration: none; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: #fff; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div class="admin-card">
+  <h2>لوحة التحكم في المباراة والإعلانات</h2>
+
+  <div class="form-group">
+    <label>رابط البث - سيرفر 1 (HD):</label>
+    <input type="text" id="server1-input" placeholder="أدخل رابط Embed أو m3u8/YouTube">
+  </div>
+
+  <div class="form-group">
+    <label>رابط البث - سيرفر 2 (FHD):</label>
+    <input type="text" id="server2-input" placeholder="أدخل رابط Embed أو m3u8/YouTube">
+  </div>
+
+  <div class="form-group">
+    <label>كود إعلان البوب أندر (Popunder Script):</label>
+    <textarea id="popunder-input" placeholder="ضع كود JavaScript للإعلان هنا"></textarea>
+  </div>
+
+  <button onclick="saveAdminData()">حفظ ونشر التغييرات للجميع</button>
+  <div class="status-msg" id="status-msg"></div>
+
+  <!-- صندوق رابط صفحة الزوار -->
+  <div class="result-box" id="result-box">
+    <div class="result-title">🔗 رابط صفحة البث العام (جاهز للتحويل والنسخ):</div>
+    <div class="link-row">
+      <input type="text" id="visitor-link-output" class="link-input" readonly>
+      <button class="copy-btn" onclick="copyVisitorLink()">نسخ</button>
+      <a id="open-link-btn" class="open-btn" href="#" target="_blank">فتح</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  const FIREBASE_ADMIN_URL = "https://live-matches-2ff6b-default-rtdb.firebaseio.com/barcelona_vs_sevilla_config.json";
+
+  async function loadCurrentConfig() {
+    try {
+      const res = await fetch(FIREBASE_ADMIN_URL);
+      const data = await res.json();
+      if (data) {
+        if (data.server1) document.getElementById('server1-input').value = data.server1;
+        if (data.server2) document.getElementById('server2-input').value = data.server2;
+        if (data.popunder) document.getElementById('popunder-input').value = data.popunder;
+      }
+    } catch (e) {
+      console.log("Error loading config:", e);
+    }
+  }
+
+  async function saveAdminData() {
+    const status = document.getElementById('status-msg');
+    status.style.color = '#38bdf8';
+    status.innerText = "جاري الحفظ والنشر...";
+
+    const payload = {
+      server1: document.getElementById('server1-input').value.trim(),
+      server2: document.getElementById('server2-input').value.trim(),
+      popunder: document.getElementById('popunder-input').value.trim()
+    };
+
+    try {
+      await fetch(FIREBASE_ADMIN_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      status.style.color = '#10b981';
+      status.innerText = "تم حفظ ونشر التغييرات للجميع بنجاح!";
+
+      // توليد رابط صفحة الزوار العامة
+      const currentPath = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+      const matchPageUrl = currentPath + "match.html";
+      
+      const resultBox = document.getElementById('result-box');
+      const linkOutput = document.getElementById('visitor-link-output');
+      const openBtn = document.getElementById('open-link-btn');
+      
+      linkOutput.value = matchPageUrl;
+      openBtn.href = matchPageUrl;
+      resultBox.classList.add('active');
+
+    } catch (e) {
+      status.style.color = '#ef4444';
+      status.innerText = "حدث خطأ أثناء الحفظ!";
+    }
+  }
+
+  function copyVisitorLink() {
+    const linkInput = document.getElementById('visitor-link-output');
+    linkInput.select();
+    linkInput.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(linkInput.value);
+    alert("تم نسخ رابط الزوار بنجاح!");
+  }
+
+  loadCurrentConfig();
+</script>
+
+</body>
+</html>
